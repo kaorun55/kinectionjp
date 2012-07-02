@@ -6,7 +6,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Kinect;
 using System.Collections.Generic;
 
-namespace training04
+namespace training04_extra
 {
     /// <summary>
     /// MainWindow.xaml の相互作用ロジック
@@ -92,7 +92,7 @@ namespace training04
                 skeletonBuffer = new Skeleton[kinect.SkeletonStream.FrameSkeletonArrayLength];
 
                 // 画像の読み込み
-                maskImage = new BitmapImage( new Uri(@"pack://application:,,,/images/kaorun55.jpg") );
+                maskImage = new BitmapImage( new Uri( @"pack://application:,,,/images/kaorun55.jpg" ) );
 
                 // RGB,Depth,Skeletonのイベントを受け取るイベントハンドラの登録
                 kinect.AllFramesReady +=
@@ -127,10 +127,10 @@ namespace training04
         /// </summary>
         /// <param name="skeletonFrame"></param>
         /// <returns></returns>
-        private List<SkeletonPoint> GetHeadPoints( SkeletonFrame skeletonFrame )
+        private List<Tuple<SkeletonPoint, Matrix4>> GetHeadPoints( SkeletonFrame skeletonFrame )
         {
             // 頭の位置のリストを作成
-            List<SkeletonPoint> headPoints = new List<SkeletonPoint>();
+            List<Tuple<SkeletonPoint, Matrix4>> headPoints = new List<Tuple<SkeletonPoint, Matrix4>>();
 
             // 骨格情報をバッファにコピー
             skeletonFrame.CopySkeletonDataTo( skeletonBuffer );
@@ -150,8 +150,9 @@ namespace training04
                     continue;
                 }
 
-                // 頭の位置を保存する
-                headPoints.Add( head.Position );
+                // 頭の位置と向きを保存する
+                headPoints.Add( Tuple.Create( head.Position,
+                    skeleton.BoneOrientations[JointType.Head].AbsoluteRotation.Matrix ));
             }
 
             return headPoints;
@@ -162,7 +163,7 @@ namespace training04
         /// </summary>
         /// <param name="colorFrame"></param>
         /// <param name="headList"></param>
-        private void FillBitmap( ColorImageFrame colorFrame, List<SkeletonPoint> headList )
+        private void FillBitmap( ColorImageFrame colorFrame, List<Tuple<SkeletonPoint, Matrix4>> headList )
         {
             // 描画の準備
             using ( var drawContecxt = drawVisual.RenderOpen() ) {
@@ -178,10 +179,19 @@ namespace training04
                     new Rect( 0, 0, colorFrame.Width, colorFrame.Height ) );
 
                 // 頭の位置にマスク画像を表示する
-                foreach ( SkeletonPoint head in headList ) {
-                    ColorImagePoint headPoint = kinect.MapSkeletonPointToColor( head, rgbFormat );
+                foreach ( var head in headList ) {
+                    ColorImagePoint headPoint = kinect.MapSkeletonPointToColor( head.Item1, rgbFormat );
+
+                    // 頭の位置の向きに回転させたマスク画像を描画する
+                    Matrix4 hm = head.Item2;
+                    Matrix rot = new Matrix( hm.M11, -hm.M12,
+                                             -hm.M21, hm.M22,
+                                             headPoint.X, headPoint.Y );
+                    drawContecxt.PushTransform( new MatrixTransform( rot ) );
+
                     drawContecxt.DrawImage( maskImage,
-                        new Rect( headPoint.X - 64, headPoint.Y - 64, 128, 128 ) );
+                        new Rect( -64, -64, 128, 128 ) );
+                    drawContecxt.Pop();
                 }
             }
 
