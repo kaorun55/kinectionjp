@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+# Visual C# Express 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "training03", "training03\training03.csproj", "{074C474F-47A0-42AB-9CC1-31668B098219}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "training04", "training04\training04.csproj", "{77B73300-478B-4E3E-AA60-CE6592DAD317}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +15,10 @@ Global
 		{074C474F-47A0-42AB-9CC1-31668B098219}.Debug|x86.Build.0 = Debug|x86
 		{074C474F-47A0-42AB-9CC1-31668B098219}.Release|x86.ActiveCfg = Release|x86
 		{074C474F-47A0-42AB-9CC1-31668B098219}.Release|x86.Build.0 = Release|x86
+		{77B73300-478B-4E3E-AA60-CE6592DAD317}.Debug|x86.ActiveCfg = Debug|x86
+		{77B73300-478B-4E3E-AA60-CE6592DAD317}.Debug|x86.Build.0 = Debug|x86
+		{77B73300-478B-4E3E-AA60-CE6592DAD317}.Release|x86.ActiveCfg = Release|x86
+		{77B73300-478B-4E3E-AA60-CE6592DAD317}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

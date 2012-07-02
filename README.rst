@@ -2,7 +2,7 @@
 http://kinection.jp のレビュー用サンプルコード
 =============================================================================
 
-* http://kinection.jp のレビュー用サンプルコードです
+http://kinection.jp のレビュー用サンプルコードです
 
 #. `やってみよう！kinectアプリ開発連載1〜3回 <http://zigsow.jp/?m=zigsow&a=page_fh_own_item_detail&own_item_id=205531>`_
 #. やってみよう！kinectアプリ開発連載4〜7回
