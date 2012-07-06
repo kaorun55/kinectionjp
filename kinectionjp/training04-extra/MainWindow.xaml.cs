@@ -184,7 +184,7 @@ namespace training04_extra
 
                     // 頭の位置の向きに回転させたマスク画像を描画する
                     Matrix4 hm = head.Item2;
-                    Matrix rot = new Matrix( hm.M11, -hm.M12,
+                    Matrix rot = new Matrix( -hm.M11, hm.M12,
                                              -hm.M21, hm.M22,
                                              headPoint.X, headPoint.Y );
                     drawContecxt.PushTransform( new MatrixTransform( rot ) );
