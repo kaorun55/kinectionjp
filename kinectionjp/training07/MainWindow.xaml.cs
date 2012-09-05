@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -57,6 +58,11 @@ namespace training07
         /// 顔のビットマップイメージ
         /// </summary>
         private BitmapImage maskImage = null;
+
+        /// <summary>
+        /// 音源の角度
+        /// </summary>
+        private double soundDir = double.NaN;
 
         /// <summary>
         /// 吹き出しのビットマップイメージ
@@ -144,6 +150,7 @@ namespace training07
 
                 // 画像の読み込み
                 maskImage = new BitmapImage( new Uri( @"pack://application:,,,/images/kaorun55.jpg" ) );
+                fukidasiImage = new BitmapImage( new Uri( @"pack://application:,,,/images/fukidasi.png" ) );
 
                 // RGB,Depth,Skeletonのイベントを受け取るイベントハンドラの登録
                 kinect.AllFramesReady +=
@@ -154,9 +161,11 @@ namespace training07
 
 
                 // 音声認識関連の設定
+                kinect.AudioSource.SoundSourceAngleChanged += AudioSource_SoundSourceAngleChanged;
+                var stream = kinect.AudioSource.Start();
+
                 speechEngine = InitSpeechEngine();
                 speechEngine.SpeechRecognized += speechEngine_SpeechRecognized;
-                var stream = kinect.AudioSource.Start();
                 var format = new SpeechAudioFormatInfo( EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null );
                 speechEngine.SetInputToAudioStream( stream, format );
                 speechEngine.RecognizeAsync( RecognizeMode.Multiple );
@@ -164,6 +173,16 @@ namespace training07
             catch ( Exception ex ) {
                 MessageBox.Show( ex.Message );
             }
+        }
+
+        /// <summary>
+        /// 音源の方向が変わったことが通知される
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        void AudioSource_SoundSourceAngleChanged( object sender, SoundSourceAngleChangedEventArgs e )
+        {
+            soundDir = e.ConfidenceLevel > 0.5 ? e.Angle : double.NaN;
         }
 
         /// <summary>
@@ -325,11 +344,38 @@ namespace training07
                     drawContecxt.DrawImage( maskImage,
                         new Rect( -size / 2, -size / 2, size, size ) );
                     drawContecxt.Pop();
+
+                    DrawFukidasi( drawContecxt, head.Item1, headPoint );
                 }
             }
 
             // 画面に表示するビットマップに描画する
             bmpBuffer.Render( drawVisual );
+        }
+
+        /// <summary>
+        /// 吹き出しを描画する
+        /// </summary>
+        /// <param name="drawContecxt"></param>
+        /// <param name="head"></param>
+        /// <param name="headPoint"></param>
+        /// <returns></returns>
+        private void DrawFukidasi( DrawingContext drawContecxt, SkeletonPoint head, ColorImagePoint headPoint )
+        {
+            double angle = Math.Atan2( head.X, head.Z ) * 180 / Math.PI;
+            if ( Math.Abs( soundDir - angle ) < 10 ) {
+                Rect rect = new Rect( headPoint.X + 32, headPoint.Y - 64, 96, 64 );
+                drawContecxt.DrawImage( fukidasiImage, rect );
+
+                if ( recognizedText != null ) {
+                    var text = new FormattedText( recognizedText,
+                        CultureInfo.GetCultureInfo( "ja-JP" ),
+                        FlowDirection.LeftToRight,
+                        new Typeface( "Verdana" ),
+                        24, Brushes.Black );
+                    drawContecxt.DrawText( text, new Point( head.X + 56, head.Y - 48 ) );
+                }
+            }
         }
 
         /// <summary>
