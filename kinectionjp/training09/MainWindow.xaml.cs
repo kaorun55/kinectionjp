@@ -100,6 +100,35 @@ namespace training09
         private KinectSensorChooser kinectChooser = new KinectSensorChooser();
 
         /// <summary>
+        /// ジェスチャー
+        /// </summary>
+        private PlayerGesture[] playerGesture;
+
+        /// <summary>
+        /// プレイヤーの情報
+        /// </summary>
+        class Player
+        {
+            public SkeletonPoint HeadPosition
+            {
+                set;
+                get;
+            }
+
+            public Matrix4 HeadRotation
+            {
+                get;
+                set;
+            }
+
+            public bool Posture
+            {
+                get;
+                set;
+            }
+        }
+
+        /// <summary>
         /// コンストラクター
         /// </summary>
         public MainWindow()
@@ -182,6 +211,10 @@ namespace training09
 
             // 骨格ストリーム用のバッファの初期化
             skeletonBuffer = new Skeleton[kinect.SkeletonStream.FrameSkeletonArrayLength];
+            playerGesture = new PlayerGesture[kinect.SkeletonStream.FrameSkeletonArrayLength];
+            for ( int i = 0; i < playerGesture.Length; i++ ) {
+                playerGesture[i] = new PlayerGesture();
+            }
 
             // RGB,Depth,Skeletonのイベントを受け取るイベントハンドラの登録
             kinect.AllFramesReady +=
@@ -280,27 +313,6 @@ namespace training09
             }
         }
 
-        class Player
-        {
-            public SkeletonPoint HeadPosition
-            {
-                set;
-                get;
-            }
-
-            public Matrix4 HeadRotation
-            {
-                get;
-                set;
-            }
-
-            public int Posture
-            {
-                get;
-                set;
-            }
-        }
-
         /// <summary>
         /// 頭の位置を返す
         /// </summary>
@@ -315,7 +327,8 @@ namespace training09
             skeletonFrame.CopySkeletonDataTo( skeletonBuffer );
 
             // 取得できた骨格ごとにループ
-            foreach ( Skeleton skeleton in skeletonBuffer ) {
+            for ( int i = 0; i < skeletonBuffer.Length; i++ ) {
+                Skeleton skeleton = skeletonBuffer[i];
                 // トラッキングできていない骨格は処理しない
                 if ( skeleton.TrackingState != SkeletonTrackingState.Tracked ) {
                     continue;
@@ -333,7 +346,7 @@ namespace training09
                 headPoints.Add( new Player() {
                     HeadPosition = head.Position,
                     HeadRotation = skeleton.BoneOrientations[JointType.Head].AbsoluteRotation.Matrix,
-                    Posture = checkPosture( skeleton ),
+                    Posture = playerGesture[i].Update( skeleton ),
                 } );
             }
 
@@ -397,7 +410,7 @@ namespace training09
 
                     // 距離に応じてサイズを決定する
                     int size = (int)(192 / head.HeadPosition.Z);
-                    if ( head.Posture == 1 ) {
+                    if ( head.Posture ) {
                         size *= 2;
                     }
 
@@ -468,50 +481,111 @@ namespace training09
             }
         }
 
-        /// <summary>
-        /// 0:ポーズなし
-        /// 1:お題のポーズ
-        /// </summary>
-        /// <param name="skeleton"></param>
-        /// <returns></returns>
-        private int checkPosture( Skeleton skeleton )
+    }
+
+    /// <summary>
+    /// プレーヤーごとのジェスチャーデータ
+    /// </summary>
+    class PlayerGesture
+    {
+        private int State;
+
+        private Skeleton PrevSkeelton;
+
+        public bool Update( Skeleton skeleton )
+        {
+            bool gesture = false;
+
+            int nextState = 0;
+            if ( checkTransState( skeleton, State, PrevSkeelton ) ) {
+                nextState = State;
+            }
+
+            int posture = checkGesturePosure( skeleton );
+            if ( (State == 0) && (posture == 1) ) {
+                nextState = 1;
+            }
+            else if ( (State == 1) && (posture == 2) ) {
+                nextState = 2;
+            }
+            else if ( (State == 2) && (posture == 3) ) {
+                nextState = 3;
+            }
+            else if ( (State == 3) && (posture == 4) ) {
+                nextState = 4;
+            }
+            else if ( (State == 4) && (posture == 1) ) {
+                nextState = 5;
+            }
+            else if ( (State == 5) && (posture == 1) ) {
+                gesture = true;
+                nextState = 5;
+            }
+
+            Trace.WriteLine( nextState.ToString() );
+            State = nextState;
+            PrevSkeelton = skeleton;
+
+            return gesture;
+        }
+
+        private int checkGesturePosure( Skeleton skeleton )
         {
             var head = skeleton.Joints[JointType.Head];
             var rwrist = skeleton.Joints[JointType.WristRight];
-            var relbow = skeleton.Joints[JointType.ElbowRight];
-            var lelbow = skeleton.Joints[JointType.ElbowLeft];
-            var lshoulder = skeleton.Joints[JointType.ShoulderLeft];
+            var center = skeleton.Joints[JointType.HipCenter];
 
-            var rwrDir = skeleton.BoneOrientations[JointType.WristRight].AbsoluteRotation.Matrix;
-            var relDir = skeleton.BoneOrientations[JointType.ElbowRight].AbsoluteRotation.Matrix;
-
-            if ( !IsTracked( head ) || !IsTracked( rwrist ) || !IsTracked( relbow ) || !IsTracked( lelbow ) || !IsTracked( lshoulder ) ) {
+            if ( !IsTracked( head ) || !IsTracked( rwrist ) || !IsTracked( center ) ) {
                 return 0;
             }
 
-            // 右手は頭より上にある
-            // 「右手首」のY座標が「頭」のY座標よりも大きい
-            bool check1 = (rwrist.Position.Y > head.Position.Y);
-
-            // 右手は真上ではなく、斜めにあげている
-            // 「右手首」のx成分またはz成分が0ではない
-            bool check2 = (Math.Abs( rwrDir.M12 ) + Math.Abs( rwrDir.M12 )) > 0.3;
-
-            // 右ひじがまっすぐ伸びている
-            // 「右ひじ」の関節の向きと「右手首」の関節の向きが同じ
-            bool check3 = (rwrDir.M12 * relDir.M12 +
-                           rwrDir.M22 * relDir.M22 +
-                           rwrDir.M32 * relDir.M32) > 0.9;
-
-            // 左手は下げている
-            // 「左ひじ」のY座標が「左肩」のY座標よりも小さい
-            bool check4 = (lelbow.Position.Y < lshoulder.Position.Y);
-
-            if ( check1 && check2 && check3 && check4 ) {
+            if ( (head.Position.Y < rwrist.Position.Y) && (head.Position.X < rwrist.Position.X) ) {
                 return 1;
+            }
+            else if ( (rwrist.Position.Y < center.Position.Y) && (center.Position.X < rwrist.Position.X) ) {
+                return 2;
+            }
+            else if ( (rwrist.Position.Y < center.Position.Y) && (rwrist.Position.X < center.Position.X) ) {
+                return 3;
+            }
+            else if ( (head.Position.Y < rwrist.Position.Y) && (rwrist.Position.X < head.Position.X) ) {
+                return 4;
             }
 
             return 0;
+        }
+
+        private const double MOVE_PLAY = 0.1;
+        private bool checkTransState( Skeleton skeleton, int state, Skeleton prevSkeleton )
+        {
+            if ( prevSkeleton == null ) {
+                return false;
+            }
+
+            // 必要な関節、方向を取得
+            var head = skeleton.Joints[JointType.Head];
+            var rwrist = skeleton.Joints[JointType.WristRight];
+            var center = skeleton.Joints[JointType.HipCenter];
+            var prevrw = prevSkeleton.Joints[JointType.WristRight];
+
+            if ( !IsTracked( head ) || !IsTracked( rwrist ) || !IsTracked( center ) || !IsTracked( prevrw ) ) {
+                return false;
+            }
+
+            if ( (state == 1) && (center.Position.X < rwrist.Position.X) && (rwrist.Position.Y < prevrw.Position.Y + MOVE_PLAY) ) {
+                return true;
+            }
+            else if ( (state == 2) && (rwrist.Position.Y < center.Position.Y) && (rwrist.Position.X < prevrw.Position.X + MOVE_PLAY) ) {
+                return true;
+            }
+            else if ( (state == 3) && (rwrist.Position.X < center.Position.X) && (prevrw.Position.Y < rwrist.Position.Y + MOVE_PLAY) ) {
+                return true;
+            }
+            else if ( (state == 4) && (head.Position.Y < rwrist.Position.Y) && (prevrw.Position.X < rwrist.Position.X + MOVE_PLAY) ) {
+                return true;
+            }
+
+            return false;
         }
 
         private static bool IsTracked( Joint joint )
